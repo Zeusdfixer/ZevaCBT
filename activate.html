@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activate Zeva CBT</title>
+  <link rel="icon" type="image/png" href="assets/favicon-32.png" />
+  <style>
+    :root {
+      --ink-navy: #0f2540;
+      --verdant: #1f8a5f;
+      --danger: #c0392b;
+      --paper-dim: #f4f6f8;
+      --line: #d8dee5;
+      --slate: #5b6b7c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(160deg, #0f2540 0%, #1a3a5c 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+      max-width: 480px;
+      width: 100%;
+      padding: 36px 32px;
+      text-align: center;
+    }
+    .logo {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 14px;
+      display: block;
+    }
+    h1 { font-size: 21px; color: var(--ink-navy); margin: 0 0 6px; }
+    .subtitle { color: var(--slate); font-size: 14px; margin: 0 0 26px; }
+    .serial-box {
+      background: var(--paper-dim);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 22px;
+    }
+    .serial-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate); margin-bottom: 6px; }
+    .serial-value {
+      font-family: 'SF Mono', Consolas, monospace;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--ink-navy);
+      letter-spacing: 0.03em;
+      word-break: break-all;
+    }
+    .copy-btn {
+      margin-top: 10px;
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--ink-navy);
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: var(--paper-dim); }
+    .instructions {
+      font-size: 13px;
+      color: var(--slate);
+      text-align: left;
+      background: var(--paper-dim);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 22px;
+      line-height: 1.6;
+    }
+    .instructions strong { color: var(--ink-navy); }
+    label {
+      display: block;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      padding: 13px 14px;
+      font-size: 16px;
+      border: 1.5px solid var(--line);
+      border-radius: 8px;
+      font-family: 'SF Mono', Consolas, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 14px;
+    }
+    input:focus { outline: none; border-color: var(--ink-navy); }
+    button.activate-btn {
+      width: 100%;
+      background: var(--ink-navy);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.activate-btn:hover { opacity: 0.92; }
+    button.activate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .message {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+    }
+    .message.error { background: #fdecea; color: var(--danger); display: block; }
+    .message.success { background: #eafaf1; color: var(--verdant); display: block; }
+    .footer-note { margin-top: 20px; font-size: 11px; color: #9aa7b3; }
+    .trial-banner {
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 22px;
+      font-size: 13px;
+      text-align: left;
+      line-height: 1.5;
+    }
+    .trial-banner.active { background: #eafaf1; color: #1f8a5f; }
+    .trial-banner.used { background: #fdecea; color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="assets/logo-icon.png" alt="Zeva CBT" class="logo" onerror="this.style.display='none'" />
+    <h1>Activate Zeva CBT</h1>
+    <p class="subtitle">by Zeus Technologies Innovations</p>
+
+    <div class="serial-box">
+      <div class="serial-label">This device's serial number</div>
+      <div class="serial-value" id="serial-value">Loading…</div>
+      <button class="copy-btn" id="copy-btn">Copy serial number</button>
+    </div>
+
+    <div id="trial-banner" style="display:none;"></div>
+
+    <div class="instructions">
+      <strong>To activate:</strong> send the serial number above to Zeus Technologies Innovations to purchase an activation code. Choose one of three plans:
+      <ul style="margin: 8px 0 0; padding-left: 18px;">
+        <li><strong>30 days</strong> — for a single exam period</li>
+        <li><strong>60 days</strong> — for a full term</li>
+        <li><strong>90 days</strong> — for extended use across multiple exam periods</li>
+      </ul>
+      Enter the code you receive below. When your plan is close to expiring, you'll see a reminder in the admin console — buy a renewal code the same way to keep going without interruption.
+    </div>
+
+    <label for="code-input">Activation code</label>
+    <input type="text" id="code-input" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" />
+    <button class="activate-btn" id="activate-btn">Activate</button>
+    <div class="message" id="message"></div>
+
+    <p class="footer-note">Zeva CBT — Powering Smarter Exams</p>
+  </div>
+
+  <script>
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/license/status');
+        const data = await res.json();
+        document.getElementById('serial-value').textContent = data.serialNumber;
+        if (data.activated) {
+          window.location.href = '/';
+          return;
+        }
+
+        const banner = document.getElementById('trial-banner');
+        if (data.trial && data.trial.alreadyUsed) {
+          banner.style.display = 'block';
+          banner.className = 'trial-banner used';
+          banner.textContent = "This device's one-time 4-day free trial has already been used and has ended. Purchase an activation code below to continue.";
+        }
+
+        if (data.expired) {
+          const heading = document.querySelector('h1');
+          if (heading) heading.textContent = 'Renew Zeva CBT';
+          const subtitle = document.querySelector('.subtitle');
+          if (subtitle) subtitle.textContent = `Your ${data.plan ? data.plan.replace('T', '') + '-day ' : ''}activation plan has ended`;
+        }
+      } catch (e) {
+        document.getElementById('serial-value').textContent = 'Unable to read — restart the app and try again.';
+      }
+    }
+    loadStatus();
+
+    document.getElementById('copy-btn').addEventListener('click', () => {
+      const text = document.getElementById('serial-value').textContent;
+      navigator.clipboard?.writeText(text).then(() => {
+        const btn = document.getElementById('copy-btn');
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      });
+    });
+
+    document.getElementById('activate-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('activate-btn');
+      const input = document.getElementById('code-input');
+      const messageEl = document.getElementById('message');
+      const code = input.value.trim();
+      if (!code) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Activating…';
+      messageEl.className = 'message';
+      messageEl.textContent = '';
+
+      try {
+        const res = await fetch('/api/license/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activationCode: code }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          messageEl.className = 'message success';
+          const expiryDate = data.expiresAt ? new Date(data.expiresAt).toLocaleDateString() : '';
+          messageEl.textContent = `Activated${data.plan ? ' — ' + data.plan.replace('T', '') + '-day plan' : ''}${expiryDate ? ', valid until ' + expiryDate : ''}. Redirecting…`;
+          setTimeout(() => { window.location.href = '/'; }, 1400);
+        } else {
+          messageEl.className = 'message error';
+          messageEl.textContent = data.message || 'Activation failed.';
+          btn.disabled = false;
+          btn.textContent = 'Activate';
+        }
+      } catch (e) {
+        messageEl.className = 'message error';
+        messageEl.textContent = 'Could not reach the server. Try again.';
+        btn.disabled = false;
+        btn.textContent = 'Activate';
+      }
+    });
+
+    document.getElementById('code-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('activate-btn').click();
+    });
+  </script>
+</body>
+</html>

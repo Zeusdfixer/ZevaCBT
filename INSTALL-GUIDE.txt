@@ -1,0 +1,416 @@
+====================================================================
+  ZEVA CBT — SERVER PACKAGING & DEPLOYMENT GUIDE  (v1.7)
+  Zeus Technologies Innovations
+====================================================================
+
+This guide covers turning the server folder into a real Windows
+.exe installer, running it across 50-100 PCs on a school LAN, issuing
+activation codes, and connecting the admin panel to a privately
+hosted result portal. Read it top to bottom once before your first
+build — steps reference each other.
+
+
+--------------------------------------------------------------------
+PART 0 — BEFORE YOU START: WHAT YOU'RE PACKAGING
+--------------------------------------------------------------------
+
+The "server" is the machine that runs Zeva CBT for a school — it
+hosts the exam data, the admin console, and serves the exam pages to
+every student PC over the school's own network (LAN). Nothing about
+this requires the internet: PCs talk to the server machine directly
+over Ethernet or Wi-Fi within the same building.
+
+One school = one installation of this packaged app, running on ONE
+computer (the "server PC" — this can just be the admin's own
+desktop/laptop, it doesn't need to be a dedicated server machine).
+Every other PC in the exam hall just opens a web browser and types
+that PC's address — no install needed on student machines at all.
+
+
+--------------------------------------------------------------------
+PART 1 — ONE-TIME SETUP ON YOUR (ZEUS TECHNOLOGIES) BUILD MACHINE
+--------------------------------------------------------------------
+
+You only do this section once, on your own computer, to produce the
+.exe you'll then give to schools.
+
+1. Install Node.js (if you don't already have it):
+   https://nodejs.org — get the current LTS (20.x) or newer. Node 22+
+   is what this app was built and tested against.
+
+2. Open a terminal / command prompt in the cbt-app folder (the folder
+   containing package.json, server/, licensing/, etc.)
+
+3. CHANGE THE LICENSE SECRET before your first real build:
+
+     node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+   Copy the long string it prints. Open licensing/license.js and
+   replace the value of ZEVA_LICENSE_SECRET near the top with it.
+   This secret is what lets you generate valid activation codes — do
+   this before you ship anything, and never share this value or
+   commit it to a public code repository. Treat it like a password.
+
+4. Install the packaging tool:
+
+     npm install --save-dev @yao-pkg/pkg
+
+5. Build the Windows executable:
+
+     npm run build:win
+
+   This produces dist/ZevaCBTServer.exe — a single file that runs
+   the whole server with no Node.js installation needed on the
+   school's PC.
+
+6. VERIFY node:sqlite SURVIVED PACKAGING (important — do this every
+   time you build, before giving the .exe to a school):
+
+     cd dist
+     ZevaCBTServer.exe 8080
+
+   Watch the terminal output. You should see:
+
+     Seeded 19 demo subjects for guest mock trials.
+     ========================================
+       ZEVA CBT LOCAL SERVER
+     ========================================
+       Status:  RUNNING
+       ...
+
+   If instead you see an error mentioning "sqlite", "node:sqlite", or
+   the process exits immediately without the "RUNNING" banner, the
+   packaged Node binary that @yao-pkg/pkg fetched for this build does
+   not support node:sqlite properly. This is a known risk with
+   packaging tools that patch a specific Node build — see
+   "FALLBACK: IF node:sqlite DOESN'T SURVIVE PACKAGING" below.
+
+7. If step 6 looked good, open a browser to http://localhost:8080 —
+   you should land on the activation screen (see Part 3). If that
+   loads, the build is good. Stop the server (Ctrl+C in the terminal)
+   and move to Part 2 to wrap it in a real installer.
+
+
+--------------------------------------------------------------------
+FALLBACK: IF node:sqlite DOESN'T SURVIVE PACKAGING
+--------------------------------------------------------------------
+
+If Part 1 Step 6 fails, you have two straightforward options:
+
+OPTION A — Ship Node.js alongside the app instead of a single .exe:
+  Skip @yao-pkg/pkg entirely. Instead, bundle a portable copy of the
+  Node.js runtime (download the Windows .zip build from nodejs.org,
+  no install required, ~50-100MB) inside your installer folder next
+  to the cbt-app source files, and have your installer's shortcut run:
+    node.exe  server\server.js
+  This is what INSTALLER-SCRIPT.nsi (Part 2) does if you set
+  USE_BUNDLED_NODE=1 at the top of that script — it's pre-written for
+  this fallback, just toggle it on.
+
+OPTION B — Swap node:sqlite for a plain JSON file store:
+  Since this app's server/db.js is the ONLY file that touches SQLite
+  (a deliberate design choice — see the comment at the top of that
+  file), you can replace its storage with plain JSON files on disk
+  without touching any other file in the app. This is more work but
+  removes the dependency entirely. Not needed unless Option A is also
+  undesirable for some reason.
+
+Option A is recommended — it's a five-minute change and guarantees
+identical behaviour to running "node server.js" directly, which is
+the exact setup already tested throughout this app's development.
+
+
+--------------------------------------------------------------------
+PART 2 — WRAPPING THE .exe IN A REAL WINDOWS INSTALLER
+--------------------------------------------------------------------
+
+A bare .exe that runs a server isn't yet something a non-technical
+admin can "install like every other normal PC app." For that you want
+a proper installer: Start Menu shortcut, Desktop icon, an uninstaller
+that shows up in "Add or Remove Programs," and your logo throughout.
+
+Use NSIS (Nullsoft Scriptable Install System) — free, widely used,
+produces a single setup.exe:
+
+1. Download NSIS: https://nsis.sourceforge.io/Download
+   Install it on your build machine (Part 1's machine).
+
+2. This package includes a ready-to-use installer script at:
+     installer/ZevaCBT-Installer.nsi
+   It already references:
+     - dist/ZevaCBTServer.exe        (from Part 1)
+     - assets/logo-icon.png          (converted to .ico — see below)
+     - LICENSE-README.txt            (shown during install)
+
+3. Convert your logo to a Windows .ico file (NSIS needs .ico, not
+   .png) — any free online "png to ico" converter works, or:
+     https://convertio.co/png-ico/
+   Save the result as installer/zeva-icon.ico
+
+4. Right-click ZevaCBT-Installer.nsi → "Compile NSIS Script"
+   (or run makensis.exe ZevaCBT-Installer.nsi from a terminal)
+
+   This produces: ZevaCBT-Setup-v1.7.exe
+
+That file is your real, shippable Windows installer. Double-clicking
+it shows a proper install wizard with your logo, installs to
+Program Files, creates Start Menu + Desktop shortcuts, and registers
+a normal uninstaller — exactly like commercial PC software.
+
+IMPORTANT — WHERE THE LICENSE FILE LIVES:
+The installer script installs the app to a folder such as:
+  C:\Program Files\Zeva CBT\
+and the server's license.json is written inside that same install
+folder (server/license.json — see licensing/license.js for why this
+matters). This is deliberate: when the customer uses "Add or Remove
+Programs" to uninstall, Windows deletes the whole install folder,
+license.json included — which is what makes a genuine uninstall +
+reinstall issue a fresh serial number, as designed. Do not change the
+install location to somewhere that survives uninstalls (like a
+shared Documents folder), or reinstalls will incorrectly keep the
+same license instead of requiring a new activation code.
+
+
+--------------------------------------------------------------------
+PART 3 — WHAT A SCHOOL ADMIN SEES (FIRST RUN)
+--------------------------------------------------------------------
+
+FREE TRIAL: every fresh installation gets a ONE-TIME, 4-day free
+trial automatically — no code needed. The very first time the app
+runs on a given PC, the trial clock starts and the full app is usable
+immediately. This is deliberate: it lets a prospective customer try
+the real thing before paying anything.
+
+The trial is tied to the physical machine, not to the installed app
+files — uninstalling and reinstalling the app on the SAME computer
+does NOT grant a new trial (it re-detects the machine has already had
+one and picks up the original countdown where it left off). Moving to
+a genuinely different computer does start a fresh trial there, the
+same way a fresh install would need its own activation code there.
+
+1. Admin double-clicks the Desktop icon (or Start Menu entry) for the
+   very first time. The app opens straight into the working admin
+   console — no activation screen, no code needed yet — with a small
+   banner in the sidebar: "Free trial: 4 days left."
+2. That banner counts down on subsequent days. Inside the final day
+   it turns more urgent-looking.
+3. Once the 4 days are up, the app returns to an ACTIVATION SCREEN
+   (the same one described below) showing this PC's serial number
+   and noting the trial has been used, prompting a purchase to
+   continue.
+4. From this point on, activation works exactly as any other
+   installation — see the rest of this Part.
+
+WHAT A RETURNING / PAYING ADMIN SEES (once the trial is used up, or
+if they skip the trial and want to buy immediately):
+
+1. They land on the ACTIVATION SCREEN showing this PC's unique serial
+   number (format: ZEVACBT-XXXX-XXXX-XXXX-XXXX) and a choice of three
+   plans:
+     - 30 days  — good for a single exam period
+     - 60 days  — good for a full term
+     - 90 days  — good for extended use across multiple exam periods
+2. The admin sends you that serial number and tells you which plan
+   they're paying for (WhatsApp, email, phone — however you take
+   payment and orders).
+3. You run (on YOUR machine, Part 1's setup):
+     node licensing/generate-activation-code.js ZEVACBT-XXXX-XXXX-XXXX-XXXX 30
+   (replace 30 with 60 or 90 for the other plans). This prints an
+   activation code that is specific to BOTH that serial number AND
+   that plan — you send that code back to the admin.
+4. The admin types the code into the activation screen and clicks
+   Activate. The console unlocks immediately — no restart needed —
+   and starts a 30/60/90-day countdown from that moment.
+5. WHEN THE PLAN IS RUNNING LOW: starting 7 days before expiry, the
+   admin console shows a low-key reminder banner in the sidebar
+   ("X days left on this installation's plan"), turning more urgent
+   inside the final 2 days, so admins can buy a renewal before being
+   locked out mid-exam-season. Once the plan actually expires, the
+   app returns to the activation screen (now titled "Renew Zeva CBT")
+   until a fresh code is purchased and entered — this is the
+   recurring-purchase mechanic: customers buy again whenever they
+   have exams coming up, rather than paying once and never again.
+6. Reinstalling the app, or moving the install to a different PC,
+   also resets PAID activation and issues a brand-new serial number
+   regardless of how much time was left on the previous plan (the
+   free trial, covered above, behaves differently on purpose) — see
+   licensing/license.js for the full explanation of how and why.
+
+Keep a simple spreadsheet or note of which serial numbers you've
+issued codes for, which plan, and to which school/customer, so you
+can handle support requests ("I lost my activation code", "when does
+our plan expire") without needing the admin to look anything up
+themselves.
+
+
+--------------------------------------------------------------------
+PART 4 — RUNNING ACROSS 50-100 PCs ON ONE SCHOOL LAN
+--------------------------------------------------------------------
+
+You do NOT install this app on every student PC. Only the ONE server
+PC needs the installer. Every other PC just needs a web browser.
+
+RECOMMENDED NETWORK SETUP FOR AN EXAM HALL / LAB:
+
+  Option A — Router + Ethernet (most reliable, recommended for exams):
+    - One consumer/office router or a basic unmanaged switch + router
+      combo is enough for 50-100 devices; a plain switch alone won't
+      hand out IP addresses, so you want something running DHCP
+      (almost any home/office router does this by default).
+    - Connect the server PC to the router via Ethernet cable.
+    - Connect student PCs to the router via Ethernet cables (a couple
+      of 24-48 port unmanaged switches daisy-chained into the router
+      easily covers 50-100 wired ports cheaply).
+    - No internet connection is required on this router at all — it
+      only needs to hand out local IP addresses and pass traffic
+      between devices on the same network. You can physically
+      disconnect it from the internet/modem entirely for exam day if
+      you want a guaranteed fully-offline room.
+
+  Option B — Wi-Fi (fine for smaller labs, more variable at 100+):
+    - Same router, but student PCs/laptops join its Wi-Fi network
+      instead of plugging in.
+    - Works fine for 20-40 devices on typical consumer routers; for
+      50-100 devices on Wi-Fi, use a proper access point rated for
+      that many concurrent clients (most "gaming"-tier home routers
+      start struggling well before 100 active Wi-Fi clients) — an
+      Ubiquiti UniFi AP, TP-Link Omada AP, or similar mid-range
+      business access point handles 100+ comfortably.
+    - A 5GHz-capable router/AP is recommended for a room this size —
+      less interference than 2.4GHz when many devices are active at
+      once — but this is about Wi-Fi speed/reliability in the room,
+      not about needing "5G" mobile data; this whole setup has
+      nothing to do with cellular networks and needs no SIM card or
+      mobile signal of any kind.
+    - Mixing Ethernet (server) + Wi-Fi (students) on the same router
+      works fine — they're on the same local network either way.
+
+  FINDING THE SERVER'S ADDRESS:
+    When the packaged app starts, its console window prints something
+    like:
+      Network: http://192.168.1.42:8080  <-- share this with student PCs
+    Write that address on the board, or better, set a fixed/static IP
+    for the server PC in the router's settings so it's the same every
+    exam day (e.g. always 192.168.1.42) and students can bookmark it.
+
+  STUDENT PC SETUP (all of them, one-time, takes 10 seconds each):
+    Open any browser (Chrome, Edge, Firefox) → type the address from
+    above → bookmark it. That's the entire "install" on a student PC.
+    Nothing to download, nothing to keep updated — every exam day
+    they just open the bookmark.
+
+  CAPACITY NOTES FOR 50-100 CONCURRENT STUDENTS:
+    - The server itself (Node.js) comfortably handles this many
+      concurrent connections for exam-taking traffic (mostly small
+      JSON requests every few seconds) on any reasonably modern PC
+      (a normal office desktop/laptop from the last 5-6 years is fine
+      — this is a light workload, not video streaming).
+    - The main real-world bottleneck at 100 devices is the NETWORK
+      hardware, not the app — spend your budget on a decent switch/AP
+      rated for the device count, not on the server PC's specs.
+    - Test with a smaller group first (10-15 PCs) before a full 100-
+      device exam day, to confirm your specific router/switch setup
+      behaves as expected in your building.
+
+
+--------------------------------------------------------------------
+PART 5 — CONNECTING THE ADMIN PANEL TO A LIVE RESULT-CHECKER PORTAL
+--------------------------------------------------------------------
+
+Everything above is for the LAN exam-taking side (fully offline, no
+internet). Separately, you can optionally host the STUDENT RESULT
+PORTAL on the public internet, so students can check results from
+home after an exam — this is the one piece that genuinely needs an
+internet-connected host, since "check from home" means "reachable
+from outside the school building."
+
+WHAT ALREADY EXISTS IN THE APP FOR THIS:
+  - portal.html / portal.js is the result-checker page students use
+    (enter reg number + exam number → see their result).
+  - The admin console's Results tab already has a "Publish to result
+    portal" action per result, and a bulk "Publish selected" action —
+    these mark results as published (visible on the portal) versus
+    kept private until the admin is ready to release them.
+
+HOW TO HOST THE PORTAL PUBLICLY (so students can reach it from home):
+
+  You have two realistic options:
+
+  OPTION A — Same server, port-forwarded (simplest, works with what's
+  already built, no code changes):
+    1. The school's server PC (from Part 1-4) is already running the
+       whole app, portal.html included, on the LAN.
+    2. On the school's internet router (a DIFFERENT router from the
+       exam-day LAN router in Part 4, or the same one if it also has
+       internet access outside exam hours), set up port forwarding:
+       forward an external port (e.g. 8080) to the server PC's local
+       IP address and port.
+    3. Use a free dynamic-DNS service (e.g. DuckDNS, No-IP) so the
+       school has a stable web address (like
+       amti-results.duckdns.org) instead of a changing IP address.
+    4. Students visit that address from home and use portal.html the
+       same way they would on the LAN.
+    CAVEAT: this exposes the FULL admin console to the internet too
+    unless you restrict it — at minimum, make sure a strong, unique
+    staff activation code/login is set (Part 3), since anyone who
+    finds the address could reach the staff login screen (though not
+    get in without valid credentials). For anything beyond a small
+    school's casual use, Option B is safer.
+
+  OPTION B — Separate, dedicated hosting for the portal only
+  (recommended for any real public exposure):
+    1. Rent inexpensive web hosting (a small VPS from providers like
+       DigitalOcean, Hetzner, or similar — often a few dollars a
+       month) or a platform that runs Node apps (Render, Railway,
+       Fly.io, etc. — many have free/cheap tiers suitable for a
+       results-lookup site).
+    2. Deploy a SEPARATE, minimal instance of just the results data +
+       portal.html/portal.js/server.js to that host — NOT the full
+       admin console, so the exam-creation/staff-login surface is
+       never exposed to the internet at all.
+    3. HOW RESULTS GET FROM THE SCHOOL LAN TO THE PUBLIC PORTAL:
+       This is the one piece of NEW wiring needed beyond what's
+       already built (the app's "publish" feature currently marks a
+       result published within its own single database — it doesn't
+       yet push data to a separate remote server). The straightforward
+       way to add this without a major rebuild: when the admin clicks
+       "Publish to result portal" (already built), also POST that
+       result's data to the public host's API
+       (https://amti-results.yourhost.com/api/results, admin-only via
+       an API key you set once in School Settings). This is a small,
+       well-contained addition to db.js/server.js (a single outbound
+       fetch call added to the existing publish action) rather than a
+       redesign — ask for this as a follow-up build whenever you're
+       ready to set up Option B's hosting, so the API key/target
+       address can be wired in against your actual hosting choice.
+    Until that small addition is built, Option A works today with
+    zero further code changes, and is a completely reasonable way to
+    start.
+
+
+--------------------------------------------------------------------
+PART 6 — QUICK REFERENCE: FILE LOCATIONS
+--------------------------------------------------------------------
+
+  package.json                        Build configuration (pkg)
+  server/server.js                    The app entry point
+  server/db.js                        All data + SQLite storage
+  server/license.json                 Created on first run — the
+                                       per-install activation record
+                                       (deleted by uninstall — this
+                                       is what makes reinstall issue
+                                       a new serial number)
+  licensing/license.js                Core licensing logic
+  licensing/generate-activation-code.js
+                                       YOUR tool (keep on your machine
+                                       only, never ship to customers)
+  activate.html                       What an unactivated install
+                                       shows instead of the app
+  installer/ZevaCBT-Installer.nsi     NSIS installer script
+  dist/ZevaCBTServer.exe              Output of "npm run build:win"
+
+
+====================================================================
+  End of guide. Questions or a broken step? Note exactly which PART
+  and step number you're stuck on when asking for help.
+====================================================================

@@ -1,0 +1,33 @@
+{
+  "name": "zeva-cbt-server",
+  "version": "1.7.0",
+  "description": "Zeva CBT — offline LAN exam server, by Zeus Technologies Innovations",
+  "main": "server/server.js",
+  "bin": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "build:win": "pkg . --targets node22-win-x64 --output dist/ZevaCBTServer.exe",
+    "build:mac": "pkg . --targets node22-macos-x64 --output dist/ZevaCBTServer-macos",
+    "build:linux": "pkg . --targets node22-linux-x64 --output dist/ZevaCBTServer-linux"
+  },
+  "pkg": {
+    "assets": [
+      "*.html",
+      "*.js",
+      "*.css",
+      "assets/**/*",
+      "licensing/**/*",
+      "server/**/*"
+    ],
+    "targets": [
+      "node22-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.10.0"
+  },
+  "author": "Zeus Technologies Innovations",
+  "license": "UNLICENSED",
+  "private": true
+}
